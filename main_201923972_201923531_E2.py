@@ -39,7 +39,7 @@ for i in range(len(labels_train)):
             labels_train[i] = "orquidea"
 #Creamos el array para guardar los labels de valid
 labels_valid = np.array([Path(ruta).stem[:-3] for ruta in valid])
-#Creamos el array para guardar los labels de valid
+#Creamos el array para guardar los labels de test
 labels_test = np.array([Path(ruta).stem[:-3] for ruta in test])
 dic_labels={"train":labels_train, "valid": labels_valid, "test": labels_test} #diccionario de anotaciones
 
@@ -50,7 +50,6 @@ if not os.path.exists('./data_mp3/shape'):os.makedirs('./data_mp3/shape')
 if not os.path.exists('./data_mp3/ResultadosInforme'):os.makedirs('./data_mp3/ResultadosInforme')
 
 #%% Descriptores de textura (filter response)
-
 def calculate_filter_response_201923972_201923531(img, filters):
     all_filter_responses = []  # arreglo donde se guardará la respuesta a los filtros
     for i in range(filters.shape[2]):  # recorremos cada filtro en el banco de filtros
@@ -59,12 +58,9 @@ def calculate_filter_response_201923972_201923531(img, filters):
         img_filter_response = img_filter_response.flatten()  # linealizamos la respuesta
         all_filter_responses.append(img_filter_response)  # guardamos la respuesta al filtro
     all_filter_responses = np.array(all_filter_responses)
-
-    responseByPixel =[]  # arreglo donde se guardará la respuesta a los filtros de cada pixel
-    for j in range(all_filter_responses.shape[1]):
-        responseByPixel.append(all_filter_responses[:, j])
+    # Se crea el arreglo con la respuesta a los filtros de cada pixel
+    responseByPixel =[all_filter_responses[:, j] for j in range(all_filter_responses.shape[1])]
     return responseByPixel
-
 #%% Filter response (train y valid)
 
 filters = scipy.io.loadmat(os.path.join('data_mp3\\filterbank.mat'))["filterbank"] # se carga el banco de filtros
@@ -72,20 +68,13 @@ lst_folder = ["train", "valid"]
 for folder in lst_folder:
     filter_response_by_img = []  # se crea una lista para guardar la respuesta a los filtros
     print("\n Calculando respuesta a los filtros en {}....".format(folder), "\nimagenes procesadas:")
-    for i in tqdm(range(len(dic_images[folder][:1]))):  # Se recorre cada ruta de la carpeta train
+    for i in tqdm(range(len(dic_images[folder]))):  # Se recorre cada ruta de la carpeta train
         img = plt.imread(dic_images[folder][i])  # la imagen se lee por defecto en rgb
         img_gris = rgb2gray(img)  # la imagen se convierte a escala de grises
         filter_response = calculate_filter_response_201923972_201923531(img_gris, filters)
         filter_response_by_img.append(filter_response)
     # Guardamos la respuesta a los filtros de cada uno de los pixels de las imagenes del folder
-    #np.save('data_mp3\\filter_response_{}.npy'.format(folder), filter_response_by_img)
-#%% Cargar filter response de train .npy
-images_filter_response = np.load(os.path.join("data_mp3","filter_response_train.npy"))
-print("#images, #pixeles, #filtros",images_filter_response.shape)
-all_filter_response_train =[]
-for filter_response in images_filter_response:
-    all_filter_response_train += list(filter_response)
-print(np.array(all_filter_response_train).shape)
+    np.save('data_mp3\\filter_response_{}.npy'.format(folder), filter_response_by_img)
 
 #%% Descriptores de textura
 
@@ -141,13 +130,20 @@ def texture_201923972_201923531(images, labels, route, textons):
 print("\ncargó la función texture_201923972_201923531")
 
 #%% Experimentacion de número de textones que hay en el diccionario 
-#list_k = [4, 8, 9, 10, 12, 14, 15, 16, 18, 20]  # definimos el número de clusters/textons de la experimentación
-list_k=[8,12,15,18]
+
+# Se carga la respuesta a los filtros de train (archivo .npy)
+images_filter_response = np.load(os.path.join("data_mp3","filter_response_train.npy"))
+print("Respuesta a los filtros en train (#images, #pixeles, #filtros) =",images_filter_response.shape)
+all_filter_response_train =[]
+for filter_response in images_filter_response:
+    all_filter_response_train += list(filter_response)
+
+list_k=[8,12,15,18]  # definimos el número de clusters/textons de la experimentación
 texton_dictionaries=[]
 print("\033[1;35m"+"\nCreando diccionarios de textones..."+ '\x1b[0m\n')
 for k in list_k:
     route_texton_dictionary = "data_mp3\\texton_dictionary\\texton_dictionary_{}.npy".format(k)  # Definimos la ruta para guardar el modelo de textons
-    #centers = calculate_texton_dictionary_201923972_2019235312(all_filter_response_train, k, route_texton_dictionary)
+    centers = calculate_texton_dictionary_201923972_2019235312(all_filter_response_train, k, route_texton_dictionary)
     texton_dictionaries.append(route_texton_dictionary)
     print("-->diccionario con {} textones creado".format(k))
 
@@ -156,7 +152,7 @@ for k in list_k:
 dic_labels_predicted_texture = {} #diccionario donde se guardará las predicciones de cada experimento
 print("\n\x1b[1;35;47m" + "EXPERIMENTACIÓN DESCRIPTORES DE TEXTURA" + '\x1b[0m\n')
 for route in texton_dictionaries:
-    texton_dictionary=np.load(route, allow_pickle = True).item()
+    texton_dictionary = np.load(route, allow_pickle = True).item()
     k = len(texton_dictionary.keys())
     print("\033[1;35m"+"\nExperimento: {} bins/textones...".format(k)+ '\x1b[0m\n')
 
@@ -205,7 +201,7 @@ def Resultados_Cuantitativos(true_labels, predicted_labels, unique_labels, name_
     plt.grid(False)
     plt.suptitle(name_experiment)
     plt.show()
-    continuar = input("\033[1;36m"+"See Plot of Confusion Matrix and Press Enter to continue..."+ '\x1b[0m\n')
+    continuar = input("\033[1;36m"+"See Plot of Confusion Matrix and Press Enter to continue..."+ '\x1b[0m')
     return df, precision, f1,  recall
 
 #%%Resultados Cuantitativos de Texture
@@ -217,7 +213,7 @@ for k, predicted_labels in dic_labels_predicted_texture.items():
         titulo = "\nExperimento--> {} bins/textones...".format(k)
         print("\n\x1b[1;35m" + titulo + '\x1b[0m\n')
         df, precision, f1, recall = Resultados_Cuantitativos(true_labels=labels_valid, predicted_labels=predicted_labels, unique_labels=unique_labels, name_experiment = titulo)
-        df_texture.iloc[i]=["{}".format(k), precision, recall, f1]
+        df_texture.iloc[i] = ["{}".format(k), precision, recall, f1]
         i += 1
 print("\n\x1b[1;35;47m" + "Métricas generales de experimentación descriptores de textura" + '\x1b[0m\n', df_texture)
 df_texture.to_csv("./data_mp3/ResultadosInforme/metricas_general_texture.csv")
@@ -255,7 +251,7 @@ true_labels = labels_valid #Creamos el array con los labels
 bins_textons = 12 #Mejor experimento Textura
 predicted_labels = dic_labels_predicted_texture[bins_textons]
 best_texton_dictionary=np.load(os.path.join("data_mp3","texton_dictionary","texton_dictionary_{}.npy".format(bins_textons)), allow_pickle = True).item() 
-np.save("texton_dictionary_201923972_201923531.npy", best_texton_dictionary)#se guarda el diccionario de textones
+#np.save("texton_dictionary_201923972_201923531.npy", best_texton_dictionary)#se guarda el diccionario de textones
 
 #Se halla el index de las imagenes bien clasificadas
 index_clasificadas_bien = true_labels == predicted_labels
@@ -267,7 +263,7 @@ for key, index in dic.items():
     fig.tight_layout()
     #fig.savefig("./data_mp3/ResultadosInforme/{}_texture_{}.png".format(key, bins_textons))
     fig.show()
-    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m\n')
+    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m')
     
 #%% Descriptores de Forma
 def shape_201923972_201923531(images, labels, route, param1, param2):
@@ -356,12 +352,12 @@ index_clasificadas_bien = true_labels == predicted_labels
 dic ={"Fortalezas":index_clasificadas_bien, "Debilidades": np.invert(index_clasificadas_bien) }
 for key, index in dic.items():
     #Realizamos una figura con las imagenes indicadas por index
-    fig = Resultados_Cualitativos(index, images, true_labels, predicted_labels,columns = 3)
+    fig = Resultados_Cualitativos(index, images, true_labels, predicted_labels,columns = 2)
     fig.suptitle("{} del método orientation: {}, pixelCell: {}".format(key, param1, param2))
     fig.tight_layout()
     #fig.savefig("./data_mp3/ResultadosInforme/{}_shape_orientation{}_pixelCell{}.png".format(key,param1,param2))
     fig.show()
-    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m\n')
+    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m')
 
 #%%Descriptores de color
 def color_201923972_201923531(images, labels, route, Type, space_bins, color_space):
@@ -389,8 +385,7 @@ def color_201923972_201923531(images, labels, route, Type, space_bins, color_spa
             hist = CatColorHistogram(img, space_bins, min_val=None, max_val=None)
         else:
             print("Error: type must be 'joint' or 'concat'")
-        # Se guarda el descriptor en un arreglo
-        features.append(hist)
+        features.append(hist)# Se guarda el descriptor en un arreglo
     features = np.asarray(features)
     if route != None: # Si la ruta es especificada, se guarda los features y labels en un archivo .mat
         dic_labels_features = {"labels": labels, "features": features}
@@ -447,7 +442,7 @@ df_general.to_csv("./data_mp3/ResultadosInforme/metricas_general_baseline.csv")
 
 images= np.array(valid) #Creamos el array de imagenes
 true_labels = labels_valid #Creamos el array con los labels
-feature = "color"; n_clusters = 15 #Mejor experiemnto
+feature = "color"; n_clusters = 20 #Mejor experiemnto
 predicted_labels = dic_labels_predicted["{}_{}".format(feature, n_clusters)]
 #Se halla el index de las imagenes bien clasificadas
 index_clasificadas_bien = true_labels == predicted_labels
@@ -460,24 +455,25 @@ for key, index in dic.items():
     fig.tight_layout()
     #fig.savefig("./data_mp3/ResultadosInforme/{}_shape_orientation{}_pixelCell{}.png".format(key,param1,param2))
     fig.show()
-    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m\n')
+    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m')
 
 #%% Guardamos el modelo entrenado del mejor experimento
-#Entrenamos el modelo
-final_kmeans_model = kmeans_classifier(n_clusters).fit(dic_features["train"]["color"], labels_train)
+final_kmeans_model = kmeans_classifier(n_clusters).fit(dic_features["train"]["color"], labels_train)#Entrenamos el modelo
 route_best_model = "final_kmeans_model_201923972_201923531.pkl"
-joblib.dump(final_kmeans_model, route_best_model)# Guardamos el modelo entrenado
-clasificador = joblib.load(route_best_model)# Cargamos el modelo previamente guardado
+#joblib.dump(final_kmeans_model, route_best_model)# Guardamos el modelo entrenado
 
 #%%Test
 true_labels=dic_labels["test"]
-n_clusters = 15# clusters del mejor Experimento
+n_clusters = 20# clusters del mejor Experimento
 print("\033[1;35m"+ "TEST" + '\x1b[0m\n')
-# ------------------------------ENTRENAMIENTO---------------------
-features_train = dic_features["train"]["color"]
-clasificador = kmeans_classifier(n_clusters)  # Creamos el objeto de clase kmeans_classifier
-clasificador.fit(features_train, dic_labels["train"])  # Entrenamos a nuestro clasificador
-print("-->Classicador entrenado")   
+if os.path.exists(route_best_model):
+    clasificador = joblib.load(route_best_model)  # Cargamos el modelo previamente guardado
+    print("Se cargó el mejor clasificador del archivo {}".format(route_best_model))
+else:# ------------------------------ENTRENAMIENTO---------------------
+    features_train = dic_features["train"]["color"]
+    clasificador = kmeans_classifier(n_clusters)  # Creamos el objeto de clase kmeans_classifier
+    clasificador.fit(features_train, dic_labels["train"])  # Entrenamos a nuestro clasificador
+    print("-->Classicador entrenado")
 # --------------------------------TEST--------------------------
 features_test = color_201923972_201923531(images=dic_images["test"], labels=dic_labels["test"], route=None, Type=TYPE,space_bins=spaceBins, color_space=colorSpace)
 predicted_labels = clasificador.predict(features_test) # Obtenemos las predicciones(labels) para nuestras imagenes de valid
@@ -494,4 +490,4 @@ for key, index in dic.items():
     fig.tight_layout()
     #fig.savefig("./data_mp3/ResultadosInforme/{}_test.png".format(key))
     fig.show()
-    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m\n')
+    continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m')
