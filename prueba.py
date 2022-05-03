@@ -52,6 +52,7 @@ if not os.path.exists('./data_mp3/texton_dictionary'): os.makedirs('./data_mp3/t
 if not os.path.exists('./data_mp3/texture'): os.makedirs('./data_mp3/texture')
 if not os.path.exists('./data_mp3/shape'): os.makedirs('./data_mp3/shape')
 if not os.path.exists('./data_mp3/ResultadosInforme'): os.makedirs('./data_mp3/ResultadosInforme')
+if not os.path.exists('./data_mp3/Modelos'): os.makedirs('./data_mp3/Modelos')
 # %%Descriptores de color
 def color_201923972_201923531(images, labels, route, Type, space_bins, color_space):
     features = []  # Se crea el arreglo para guardar los descriptores
@@ -255,7 +256,7 @@ for feature in dic_features["train"]:
             print("\033[1;35m" + titulo + '\x1b[0m\n')
             # --------------ENTRENAMIENTO-----------------
             features_train = dic_features["train"][feature]
-            clasificador = SVC(C=c, gamma=g, kernel='rbf', class_weight='balanced')
+            clasificador = SVC(C=c, gamma=g, kernel='rbf', class_weight='balanced',random_state=42)
             clasificador.fit(features_train, dic_labels["train"])  # Entrenamos a nuestro clasificador
             print("-->Classicador entrenado")
             # ----------------VALIDACIÓN----------------
@@ -291,7 +292,9 @@ for key, index in dic.items():
     fig.show()
     continuar = input("\033[1;36m"+" Press Enter to continue..."+ '\x1b[0m')
 # Guardamos el modelo entrenado del mejor experimento
-
+clasificador = SVC(C=cp, gamma=gam, kernel='rbf', class_weight='balanced',random_state=42)
+clasificador.fit(features_train, dic_labels["train"])
+joblib.dump(clasificador, './data_mp3/Modelos/final_SVM_model_201923972_201923531.pkl')
 #%% Experimento variando parámetros n_estimators y max_features para RandomForest
 n_estim = [10, 50, 100, 200, 500]
 max_feat = ["auto", "sqrt", "log2", None]
@@ -321,7 +324,9 @@ for feature in dic_features["train"]:
             df_gen.iloc[j] = ["{}_{}_{}".format(feature, n, feat), precision, recall, f1]
             j+= 1
 # Guardamos el modelo entrenado del mejor experimento
-
+clasificador = RandomForestClassifier(n_estimators=n, max_features=feat, random_state=42)
+clasificador.fit(features_train, dic_labels["train"])
+joblib.dump(clasificador, './data_mp3/Modelos/final_RF_model_201923972_201923531.pkl')
 #%% Resultados Cualitativos y Cuantitativos
 print("\n\x1b[1;35;47m" + "Métricas generales de EXPERIMENTACIÓN: NÚMERO DE CLUSTERS" + '\x1b[0m\n')
 print(df_gen)
