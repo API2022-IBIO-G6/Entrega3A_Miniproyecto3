@@ -219,28 +219,45 @@ def Resultados_Cuantitativos(true_labels, predicted_labels, unique_labels, name_
 print("Función Resultados_Cuantitativos cargada")
 # %% Descriptores (color, texture, shape) para experimentación variando numero de clusters
 
-TYPE = "joint";
-colorSpace = "hsv";
-spaceBins = 10  # Mejor Experimento color
+TYPE = "joint"; colorSpace = "hsv"; spaceBins = 10  # Mejor Experimento color
 bins_textons = 12  # Mejor experimento textura
-best_texton_dictionary = np.load(
-    os.path.join("data_mp3", "texton_dictionary", "texton_dictionary_{}.npy".format(bins_textons)),
-    allow_pickle=True).item()
-param1 = 32;
-param2 = 32  # Mejor experimemnto shape
+best_texton_dictionary = np.load(os.path.join("data_mp3", "texton_dictionary", "texton_dictionary_{}.npy".format(bins_textons)),allow_pickle=True).item()
+param1 = 32; param2 = 32  # Mejor experimemnto shape
 dic_features = {"train": {}, "valid": {}}  # diccionario de features
 lst_folder = ["train", "valid"]
 for folder in lst_folder:
     print("\n\x1b[1;35m" + "Calculando descriptores para {}...".format(folder) + '\x1b[0m\n')
+    route_color = "features_labels_{}_{}_{}_{}".format(folder, TYPE, colorSpace, spaceBins)
+    route_texture = "features_labels_{}_{}".format(bins_textons, folder)
+    route_shape = "features_labels_{}_orientation{}_pixelCell{}".format(folder,param1, param2)
     # hallamos los descriptores (feaures) para el mejor experimento
     dic_features[folder] = {
-        "color": color_201923972_201923531(images=dic_images[folder], labels=dic_labels[folder], route=None, Type=TYPE,
+        "color": color_201923972_201923531(images=dic_images[folder], labels=dic_labels[folder], route=route_color, Type=TYPE,
                                            space_bins=spaceBins, color_space=colorSpace),
         "texture": texture_201923972_201923531(images=dic_images[folder], labels=dic_labels[folder], route=None,
                                                textons=best_texton_dictionary),
         "shape": shape_201923972_201923531(images=dic_images[folder], labels=dic_labels[folder], route=None,
                                            param1=param1, param2=param2)}
-
+#%% Experimentacion clasificadores con parametros por defecto
+clasificadores = {"SVM": SVC(), "RF": RandomForestClassifier()}
+df_general = pd.DataFrame(columns=["Clasificador", "Descriptor", "Precisión", "Cobertura", "F1"],index=range(6))
+dic_labels_predicted = {}  # diccionario donde se guardará las predicciones de cada experimento
+i = 0
+for name, clasificador in clasificadores.items():
+    for feature in dic_features["train"]:
+        titulo = "Experimento: clasificador {} con descriptor {}".format(name, feature)
+        print("\n\x1b[1;35m" + titulo + '\x1b[0m\n')
+        clasificador.fit(X=dic_features["train"][feature], y=dic_labels["train"])# ENTRENAMIENTO
+        predicted_labels = clasificador.predict(X=dic_features["valid"][feature]) #VALIDACION
+        dic_labels_predicted[name + "_" + feature] = predicted_labels #GUARDAMOS LAS PREDICCIONES
+        df, precision, f1, recall =Resultados_Cuantitativos(true_labels=dic_labels["valid"],
+                                                                 predicted_labels=predicted_labels,
+                                                                 unique_labels=unique_labels, name_experiment=titulo) #RESULTADOS
+        df_general.loc[i] = [name, feature, precision, recall, f1] #RESULTADOS GENERALES
+        i += 1
+print("\n\x1b[1;35;47m" + "Métricas generales experimentación clasificadores automaticos" + '\x1b[0m\n')
+print(df_general)
+df_general.to_csv("./data_mp3/ResultadosInforme/metricas_general_auto.csv")
 #%% Experimento variando parámetros C y gamma de SVM
 
 C = [1e3, 5e3, 1e4, 5e4, 1e5]
@@ -251,9 +268,8 @@ i = 0
 for feature in dic_features["train"]:
     for c in C:
         for g in gamma:
-            print("\n\x1b[1;35m" + "Calculando SVM para {} con C={} y gamma={}...".format(feature, c, g) + '\x1b[0m\n')
-            titulo = "\nExperimento: C: {}, gamma:{}...".format(c, g)
-            print("\033[1;35m" + titulo + '\x1b[0m\n')
+            titulo = "SVM para descriptor de {} con C={} y gamma={}".format(feature, c, g)
+            print("\n\x1b[1;35m" + "Experimento: " + titulo + '\x1b[0m\n')
             # --------------ENTRENAMIENTO-----------------
             features_train = dic_features["train"][feature]
             clasificador = SVC(C=c, gamma=g, kernel='rbf', class_weight='balanced',random_state=42)
@@ -270,18 +286,18 @@ for feature in dic_features["train"]:
                                                                  unique_labels=unique_labels, name_experiment=titulo)
             df_general.iloc[i] = ["{}_{}_{}".format(feature,c,g), precision, recall, f1]
             i += 1
+
 #%% Resultados Cualitativos y Cuantitativos SVM
-print("\n\x1b[1;35;47m" + "Métricas generales de EXPERIMENTACIÓN: NÚMERO DE CLUSTERS" + '\x1b[0m\n')
+print("\n\x1b[1;35;47m" + "Métricas generales de experimentación con SVM variando parámetros C y gamma" + '\x1b[0m\n')
 print(df_general)
-df_general.to_csv("./data_mp3/ResultadosInforme/metricas_general_baseline.csv")
+df_general.to_csv("./data_mp3/ResultadosInforme/metricas_general_SVM.csv")
 
 images= np.array(valid) #Creamos el array de imagenes
 true_labels = labels_valid #Creamos el array con los labels
 feature = "color"; cp = 5e4; gam= 0.1 #Mejor experiemnto
 predicted_labels = dic_labels_predicted["{}_{}_{}".format(feature, cp,gam)]
-#Se halla el index de las imagenes bien clasificadas
-index_clasificadas_bien = true_labels == predicted_labels
-dic ={"Fortalezas":index_clasificadas_bien, "Debilidades": np.invert(index_clasificadas_bien) }
+index_clasificadas_bien = true_labels == predicted_labels #Se halla el index de las imagenes bien clasificadas
+dic = {"Fortalezas": index_clasificadas_bien, "Debilidades": np.invert(index_clasificadas_bien) }
 
 for key, index in dic.items():
     #Realizamos una figura con las imagenes indicadas por index
@@ -295,6 +311,7 @@ for key, index in dic.items():
 clasificador = SVC(C=cp, gamma=gam, kernel='rbf', class_weight='balanced',random_state=42)
 clasificador.fit(features_train, dic_labels["train"])
 joblib.dump(clasificador, './data_mp3/Modelos/final_SVM_model_201923972_201923531.pkl')
+
 #%% Experimento variando parámetros n_estimators y max_features para RandomForest
 n_estim = [10, 50, 100, 200, 500]
 max_feat = ["auto", "sqrt", "log2", None]
