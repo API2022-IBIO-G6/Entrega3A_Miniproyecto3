@@ -138,8 +138,8 @@ all_filter_response_train =[]
 for filter_response in images_filter_response:
     all_filter_response_train += list(filter_response)
 
-list_k=[8,12,15,18]  # definimos el número de clusters/textons de la experimentación
-texton_dictionaries=[]
+list_k = [8, 12, 15, 18]  # definimos el número de clusters/textons de la experimentación
+texton_dictionaries = []
 print("\033[1;35m"+"\nCreando diccionarios de textones..."+ '\x1b[0m\n')
 for k in list_k:
     route_texton_dictionary = "data_mp3\\texton_dictionary\\texton_dictionary_{}.npy".format(k)  # Definimos la ruta para guardar el modelo de textons
@@ -154,7 +154,7 @@ print("\n\x1b[1;35;47m" + "EXPERIMENTACIÓN DESCRIPTORES DE TEXTURA" + '\x1b[0m\
 for route in texton_dictionaries:
     texton_dictionary = np.load(route, allow_pickle = True).item()
     k = len(texton_dictionary.keys())
-    print("\033[1;35m"+"\nExperimento: {} bins/textones...".format(k)+ '\x1b[0m\n')
+    print("\033[1;35m"+"\nExperimento: {} bins/textones...".format(k) + '\x1b[0m\n')
 
     # --------------ENTRENAMIENTO-----------------
     # Definimos la ruta para guardar los descriptores de textura de train
