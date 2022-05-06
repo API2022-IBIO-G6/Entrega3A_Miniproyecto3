@@ -144,10 +144,8 @@ df_general.to_csv("./data_mp3/ResultadosInforme/metricas_general_auto.csv")
 
 #%% Experimento variando parámetros C y gamma de SVM
 print("\n\x1b[1;36;47m" + "Máquinas de soporte vectorial" + '\x1b[0m\n')
-#C = [1e3, 5e3, 1e4, 5e4, 1e5]
-#gamma = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1]
 C = [1e3, 5e3]
-gamma = [0.001, 0.1]
+gamma = [0.01, 0.001]
 feature ="color" # Descriptor con que se obtuvo mejores metricas
 features_train = dic_features["train"][feature]
 features_valid = dic_features["valid"][feature]
@@ -177,14 +175,15 @@ df_general_SVM.to_csv("./data_mp3/ResultadosInforme/metricas_general_SVM.csv")
 
 images= np.array(valid) #Creamos el array de imagenes
 true_labels = labels_valid #Creamos el array con los labels
-feature = "color"; best_c = 5e3; best_gamma = 0.1 #Mejor experiemnto
+feature = "color"; best_c = 5e3; best_gamma = 0.01 #Mejor experiemnto
 predicted_labels = dic_labels_predicted_SVM["{}_{}_{}".format(feature,best_c, best_gamma)]
 index_clasificadas_bien = true_labels == predicted_labels #Se halla el index de las imagenes bien clasificadas
 dic = {"Fortalezas": index_clasificadas_bien, "Debilidades": np.invert(index_clasificadas_bien) }
+columnas = {"Fortalezas": 3,"Debilidades": 1}
 
 for key, index in dic.items():
     #Realizamos una figura con las imagenes indicadas por index
-    fig = Resultados_Cualitativos(index, images, true_labels, predicted_labels,columns = 3)
+    fig = Resultados_Cualitativos(index, images, true_labels, predicted_labels,columns = columnas[key])
     fig.suptitle("Validación: {} de SVM para descriptor de {} con C={} y gamma={}".format(key, feature, best_c, best_gamma))
     fig.tight_layout()
     fig.savefig("./data_mp3/ResultadosInforme/{}_c{}_gamma{}.png".format(key,best_c, best_gamma))
@@ -201,9 +200,6 @@ print("\n\x1b[1;36;47m" + "Arboles de decisión" + '\x1b[0m\n')
 print("Parametros variando:", "\n-->n_estimators (número de arboles)","\n-->max_features (El número de características a considerar al buscar la mejor división)")
 n_trees = [10, 50]
 max_feat = ["auto", "log2"]
-
-#n_trees = [10, 50, 100, 200, 500]
-#max_feat = ["auto", "sqrt", "log2", None]
 
 feature="color" # Descriptor con que se obtuvo mejores metricas
 features_train = dic_features["train"][feature]
@@ -256,8 +252,6 @@ clasificador.fit(features_train, dic_labels["train"])
 
 #%% Experimento variando parámetros n_estimators y max_features para perceptrón multicapa
 print("\n\x1b[1;36;47m" + "Perceptrón multicapa" + '\x1b[0m\n')
-#hidden_layer_sizes = [(10,10,10), (10,10), (10,), (50,50,50),(50,50), (50,)]
-#activation = ["identity", "tanh", "relu"]
 
 hidden_layer_sizes = [(50),(50,50)]
 activation = ["identity", "logistic"]
@@ -324,7 +318,7 @@ for folder in ["train", "valid"]:
         "color+textura+forma": np.concatenate((color,forma,textura), axis=1)}
     print("-->Descriptores mixtos para {} creados".format(folder))
 
-best_c = 5e3; best_gamma = 0.1 #Mejor experiemnto SVM
+ntree = 50; maxFeat = "auto" #Mejor experimento RF
 df_general_mix = pd.DataFrame(columns=["descriptor mixto", "precision", "cobertura", "f-medida"], index=range(4))
 dic_labels_predicted_mix = {}
 l = 0
@@ -333,8 +327,8 @@ for mix_feature in dic_mix_features["train"]:
     print("\n\x1b[1;36m" + "Experimento: " + titulo + '\x1b[0m\n')
     # --------------ENTRENAMIENTO-----------------
     features_train = dic_mix_features["train"][mix_feature]
-    clasificador = SVC(C=best_c, gamma=best_gamma, kernel='rbf', class_weight='balanced', random_state=42)
-    clasificador.fit(features_train, dic_labels["train"])  # Entrenamos a nuestro clasificador
+    clasificador = RandomForestClassifier(n_estimators=ntree, max_features=maxFeat, random_state=42)
+    clasificador.fit(features_train, dic_labels["train"])
     # ----------------VALIDACIÓN----------------
     features_valid = dic_mix_features["valid"][mix_feature]
     predicted_labels = clasificador.predict(features_valid)  # Obtenemos las predicciones(labels) para nuestras imagenes de valid
@@ -350,17 +344,16 @@ df_general_mix.to_csv("./data_mp3/ResultadosInforme/metricas_general_mix.csv")
 
 #%% Test
 true_labels=dic_labels["test"]
-#route_best_model="final_SVM_model_201923972_201923531.pkl"# ruta mejor modelo
-route_best_model='./data_mp3/Modelos/final_RF_model_201923972_201923531.pkl'
+route_best_model='final_RF_model_201923972_201923531.pkl'# ruta mejor modelo
 print("\033[1;35m"+ "TEST" + '\x1b[0m\n')
 if os.path.exists(route_best_model):
     clasificador = joblib.load(route_best_model)  # Cargamos el modelo previamente guardado
     print("Se cargó el mejor clasificador del archivo {}".format(route_best_model))
 else:# ------------------------------ENTRENAMIENTO---------------------
     features_train = dic_features["train"]["color"]
-    best_c = 5e3;best_gamma = 0.1  # Mejor experiemnto SVM
-    clasificador = SVC(C=best_c, gamma=best_gamma, kernel='rbf', class_weight='balanced', random_state=42)
-    clasificador.fit(features_train, dic_labels["train"])  # Entrenamos a nuestro clasificador
+    ntree = 50;maxFeat = "auto"  # Mejor experimento RF
+    clasificador = RandomForestClassifier(n_estimators=ntree, max_features=maxFeat, random_state=42)
+    clasificador.fit(features_train, dic_labels["train"])
 # --------------------------------TEST--------------------------
 features_test = scipy.io.loadmat("features_labels_test_color")["features"]
 predicted_labels = clasificador.predict(features_test) # Obtenemos las predicciones(labels) para nuestras imagenes de valid
@@ -368,12 +361,12 @@ predicted_labels = clasificador.predict(features_test) # Obtenemos las prediccio
 df, precision, f1,  recall= Resultados_Cuantitativos(true_labels=dic_labels["test"], predicted_labels=predicted_labels, unique_labels=unique_labels, name_experiment="TEST")
 df.to_csv("./data_mp3/ResultadosInforme/metricas_test.csv")
 index_clasificadas_bien = true_labels == predicted_labels #Se halla el index de las imagenes bien clasificadas
-dic ={"Fortalezas":index_clasificadas_bien, "Debilidades": np.invert(index_clasificadas_bien) }
-columnas = {"Fortalezas": 3,"Debilidades": 2}
+dic = {"Fortalezas":index_clasificadas_bien, "Debilidades": np.invert(index_clasificadas_bien) }
+columnas = {"Fortalezas": 3,"Debilidades": 1}
 for key, index in dic.items():
     #Realizamos una figura con las imagenes indicadas por index
     fig = Resultados_Cualitativos(index, dic_images["test"], dic_labels["test"], predicted_labels,columns = columnas[key])
-    fig.suptitle("Test: {} de SVM con el descriptor de color".format(key))
+    fig.suptitle("Test: {} de RF con el descriptor de color".format(key))
     fig.tight_layout()
     fig.savefig("./data_mp3/ResultadosInforme/{}_test.png".format(key))
     fig.show()

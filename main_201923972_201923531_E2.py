@@ -465,6 +465,7 @@ route_best_model = "final_kmeans_model_201923972_201923531.pkl"
 #%%Test
 true_labels=dic_labels["test"]
 n_clusters = 20# clusters del mejor Experimento
+route_best_model= "final_kmeans_model_201923972_201923531.pkl"
 print("\033[1;35m"+ "TEST" + '\x1b[0m\n')
 if os.path.exists(route_best_model):
     clasificador = joblib.load(route_best_model)  # Cargamos el modelo previamente guardado
@@ -475,11 +476,12 @@ else:# ------------------------------ENTRENAMIENTO---------------------
     clasificador.fit(features_train, dic_labels["train"])  # Entrenamos a nuestro clasificador
     print("-->Classicador entrenado")
 # --------------------------------TEST--------------------------
-features_test = color_201923972_201923531(images=dic_images["test"], labels=dic_labels["test"], route=None, Type=TYPE,space_bins=spaceBins, color_space=colorSpace)
+features_test = scipy.io.loadmat("features_labels_test_color")["features"]
 predicted_labels = clasificador.predict(features_test) # Obtenemos las predicciones(labels) para nuestras imagenes de valid
 print("-->Test terminado")
 #------------Resultados Cualitativos y Cuantitativos---------------
 df, precision, f1,  recall= Resultados_Cuantitativos(true_labels=dic_labels["test"], predicted_labels=predicted_labels, unique_labels=unique_labels, name_experiment="TEST")
+df.to_csv("./data_mp3/ResultadosInforme/metricas_test_kmeans.csv")
 #Se halla el index de las imagenes bien clasificadas
 index_clasificadas_bien = true_labels == predicted_labels
 dic ={"Fortalezas":index_clasificadas_bien, "Debilidades": np.invert(index_clasificadas_bien) }
