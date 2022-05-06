@@ -350,7 +350,8 @@ df_general_mix.to_csv("./data_mp3/ResultadosInforme/metricas_general_mix.csv")
 
 #%% Test
 true_labels=dic_labels["test"]
-route_best_model="final_SVM_model_201923972_201923531.pkl"# ruta mejor modelo
+#route_best_model="final_SVM_model_201923972_201923531.pkl"# ruta mejor modelo
+route_best_model='./data_mp3/Modelos/final_RF_model_201923972_201923531.pkl'
 print("\033[1;35m"+ "TEST" + '\x1b[0m\n')
 if os.path.exists(route_best_model):
     clasificador = joblib.load(route_best_model)  # Cargamos el modelo previamente guardado
